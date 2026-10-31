@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin</title>
+<style>
+body{background:#0b0b10;color:#f6d98b;font-family:Georgia,serif;padding:16px;max-width:720px;margin:auto}
+h1,h2{font-weight:400}input,textarea{width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #c9a24d;background:#000;color:#f6d98b;font:inherit}
+textarea{min-height:140px}button{background:#000;color:#f6d98b;border:1px solid #f6d98b;border-radius:20px;padding:9px 16px;font:inherit;cursor:pointer;margin:4px 2px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0}.go{background:#8a0d12}
+.r{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #333;padding:8px 0;font-size:14px;flex-wrap:wrap}
+.r input{flex:1 1 100%}#toast{position:sticky;top:0;background:#14101f;padding:6px;color:#fff;min-height:20px}.cnt{font-size:56px;margin:0}
+</style></head><body>
+<div id="login"><h1>Admin</h1><button id="in" class="go">Sign in with Google</button><p id="msg"></p></div>
+<div id="app" hidden>
+<h1>Mikaaeel Arnold · Admin</h1><div id="toast"></div>
+<label><input type="checkbox" id="ntf" checked style="width:auto"> Email my subscribers when I publish</label>
+<div class="tabs"><button class="tab" data-t="books">Books</button><button class="tab" data-t="bundle">Bundle</button><button class="tab" data-t="poems">Poems</button><button class="tab" data-t="blog">Blog</button><button class="tab" data-t="comments">Comments</button><button class="tab" data-t="subs">Subscribers</button><button id="out">Sign out</button></div>
+
+<section class="p" data-p="books"><h2>Add a book</h2>
+<input id="bt" placeholder="Title"><input id="ba" placeholder="Author (default Mikaaeel Arnold)"><input id="bf" placeholder="Format (e.g. Ebook)"><input id="bg" placeholder="Genre"><input id="by" placeholder="Year published"><textarea id="bd" placeholder="Short description"></textarea><input id="bu" placeholder="Buy link (https://...)">
+<label>Cover image <input id="bc" type="file" accept="image/*"></label><button id="bk" class="go">Publish book</button><h2>Your books</h2><div id="lb"></div></section>
+
+<section class="p" data-p="bundle" hidden><h2>Bundle</h2>
+<input id="ut" placeholder="Bundle title"><input id="up" placeholder="Price e.g. $2.49"><textarea id="ud" placeholder="What is included (one per line)"></textarea><input id="uu" placeholder="Buy link (optional, https://...)"><button id="ub" class="go">Save bundle</button></section>
+
+<section class="p" data-p="poems" hidden><h2>Post a poem</h2>
+<input id="pt" placeholder="Title"><input id="ps" placeholder="Subtitle (optional)"><input id="pn" placeholder="Content note (optional)"><textarea id="px" placeholder="Poem text (blank line between stanzas)"></textarea><button id="pb" class="go">Publish poem</button><h2>Your poems</h2><div id="lp"></div></section>
+
+<section class="p" data-p="blog" hidden><h2>New blog post</h2>
+<textarea id="gx" placeholder="Write your post"></textarea><button id="gb" class="go">Publish post</button><h2>Your posts</h2><div id="lg"></div></section>
+
+<section class="p" data-p="comments" hidden><h2>All comments</h2><div id="lc"></div></section>
+
+<section class="p" data-p="subs" hidden><h2>Subscribers</h2><p class="cnt" id="cnt">0</p><button id="csv">Download list (CSV)</button><div id="ls"></div></section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js"></script>
+<script type="module">
+import {CFG,ADMIN_EMAIL,SITE,EJS} from "./config.js";
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,collection,doc,addDoc,setDoc,getDocs,deleteDoc,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const app=initializeApp(CFG),auth=getAuth(app),db=getFirestore(app);
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],v=id=>$('#'+id).value.trim(),say=t=>{$('#toast').textContent=t;};
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#in').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>$('#msg').textContent=e.message);
+$('#out').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{const ok=!!u&&u.email===ADMIN_EMAIL;$('#login').hidden=ok;$('#app').hidden=!ok;if(u&&!ok){$('#msg').textContent='This Google account is not the site owner.';signOut(auth);}if(ok)load();});
+$$('.tab').forEach(b=>b.onclick=()=>$$('.p').forEach(p=>p.hidden=p.dataset.p!==b.dataset.t));
+const all=async(c,o)=>(await getDocs(o?query(collection(db,c),orderBy(o,'desc')):collection(db,c))).docs.map(d=>({id:d.id,...d.data()}));
+const img=f=>new Promise(r=>{if(!f)return r('');const im=new Image();im.onload=()=>{const w=320,h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);r(c.toDataURL('image/jpeg',.75));};im.onerror=()=>r('');im.src=URL.createObjectURL(f);});
+async function notify(subject,message,hash){if(!$('#ntf').checked)return;try{const subs=await all('subscribers');let n=0;for(const s of subs){try{await emailjs.send(EJS.service,EJS.template,{to_name:s.name,to_email:s.email,subject,message,link:SITE+hash},{publicKey:EJS.key});n++;}catch(e){}}say('Saved. Emailed '+n+' of '+subs.length+' subscribers.');}catch(e){say('Saved, but emailing failed.');}}
+const run=async f=>{try{await f();}catch(e){say('Error: '+e.message);}};
+$('#bk').onclick=()=>run(async()=>{const t=v('bt');if(!t)return say('Add a title.');await addDoc(collection(db,'books'),{title:t,author:v('ba')||'Mikaaeel Arnold',format:v('bf'),genre:v('bg'),year:v('by'),desc:v('bd'),url:v('bu'),cover:await img($('#bc').files[0]),created:serverTimestamp()});say('Book added.');await notify('New book: '+t,'A new book is now available.','#books');load();});
+$('#ub').onclick=()=>run(async()=>{await setDoc(doc(db,'settings','bundle'),{title:v('ut'),price:v('up'),desc:$('#ud').value.trim(),url:v('uu')});say('Bundle saved.');await notify('Bundle: '+v('ut'),'The bundle has been updated.','#books');});
+$('#pb').onclick=()=>run(async()=>{const t=v('pt'),x=$('#px').value.trim();if(!t||!x)return say('Add a title and the poem.');await addDoc(collection(db,'poems'),{title:t,subtitle:v('ps'),note:v('pn'),text:x,likes:0,created:serverTimestamp()});say('Poem published.');['pt','ps','pn','px'].forEach(i=>$('#'+i).value='');await notify('New poem: '+t,'A new poem has been posted.','#poetry');load();});
+$('#gb').onclick=()=>run(async()=>{const x=$('#gx').value.trim();if(!x)return say('Write something first.');await addDoc(collection(db,'posts'),{text:x,likes:0,created:serverTimestamp()});say('Post published.');$('#gx').value='';await notify('New blog post',x.slice(0,200),'#blog');load();});
+async function load(){
+const [b,p,g,c,s]=await Promise.all([all('books','created'),all('poems','created'),all('posts','created'),all('comments','created'),all('subscribers','created')]);
+const row=(col,x,t)=>'<div class="r"><span>'+t+'</span><button data-d="'+col+'/'+x+'">Delete</button></div>';
+$('#lb').innerHTML=b.map(x=>row('books',x.id,esc(x.title))).join('');
+$('#lp').innerHTML=p.map(x=>row('poems',x.id,esc(x.title)+' · ♥ '+(x.likes||0))).join('');
+$('#lg').innerHTML=g.map(x=>'<div class="r"><span>'+esc(x.text.slice(0,120))+' · ♥ '+(x.likes||0)+'</span><button data-d="posts/'+x.id+'">Delete</button><input id="ac'+x.id+'" placeholder="Comment as the author"><button data-ca="'+x.id+'">Comment</button></div>').join('');
+$('#lc').innerHTML=c.map(x=>row('comments',x.id,esc((x.isAuthor?'★ You':x.name)+': '+x.text))).join('');
+$('#cnt').textContent=s.length;
+$('#ls').innerHTML=s.map(x=>row('subscribers',x.id,esc(x.name)+' · '+esc(x.email))).join('');
+window._s=s;}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+if(b.dataset.d)run(async()=>{if(!confirm('Delete this?'))return;await deleteDoc(doc(db,...b.dataset.d.split('/')));load();});
+if(b.dataset.ca)run(async()=>{const i=$('#ac'+b.dataset.ca),t=i.value.trim();if(!t)return;await addDoc(collection(db,'comments'),{postId:b.dataset.ca,name:'Mikaaeel Arnold',text:t.slice(0,300),isAuthor:true,created:serverTimestamp()});i.value='';say('Comment posted.');load();});});
+$('#csv').onclick=()=>{const t='name,email\n'+(window._s||[]).map(x=>'"'+(x.name||'').replace(/"/g,'""')+'",'+x.email).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='subscribers.csv';a.click();};
+</script></body></html>

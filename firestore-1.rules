@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'mikaaeelarnold1@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function likeOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+        && request.resource.data.likes >= 0
+        && (request.resource.data.likes == resource.data.likes + 1
+            || request.resource.data.likes == resource.data.likes - 1);
+    }
+    match /books/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /poems/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || likeOnly();
+    }
+    match /posts/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || likeOnly();
+    }
+    match /comments/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.text is string
+        && request.resource.data.text.size() <= 300
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && (request.resource.data.isAuthor != true || isAdmin());
+      allow delete: if isAdmin();
+    }
+    match /subscribers/{id} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 120;
+      allow read, delete: if isAdmin();
+    }
+  }
+}
