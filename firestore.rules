@@ -33,6 +33,17 @@ service cloud.firestore {
         && (request.resource.data.isAuthor != true || isAdmin());
       allow delete: if isAdmin();
     }
+    match /upcoming/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /orders/{id} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 120
+        && request.resource.data.item is string
+        && request.resource.data.item.size() <= 200
+        && request.resource.data.type in ['preorder', 'bundle'];
+      allow read, delete: if isAdmin();
+    }
     match /subscribers/{id} {
       allow create: if request.resource.data.name is string
         && request.resource.data.name.size() <= 80
