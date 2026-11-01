@@ -12,5 +12,5 @@ export const CFG = {
 export const SITE = "https://mikaaeelarnold1-dev.github.io/mikaaeelarnold/";
 // 3) The only Google account allowed into the admin page
 export const ADMIN_EMAIL = "mikaaeelarnold1@gmail.com";
-// 4) From EmailJS: Public Key, Service ID, Template ID (add these later)
-export const EJS = { key: "PASTE", service: "PASTE", template: "PASTE" };
+// 4) From EmailJS: Public Key, Service ID, Template ID 
+export const EJS = { key: "O5EgDdhPkpaAi2pKJ", service: "service_oy0y9rj", template: "template_p791kqe" };
